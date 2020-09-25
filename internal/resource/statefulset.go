@@ -257,14 +257,30 @@ func (builder *StatefulSetBuilder) podTemplateSpec(annotations, labels map[strin
 
 	terminationGracePeriod := defaultGracePeriodTimeoutSeconds
 
+	trueValue := true
 	volumes := []corev1.Volume{
 		{
-			Name: "server-conf",
+			Name: "rabbitmq-etc",
 			VolumeSource: corev1.VolumeSource{
 				ConfigMap: &corev1.ConfigMapVolumeSource{
 					LocalObjectReference: corev1.LocalObjectReference{
 						Name: builder.Instance.ChildResourceName(serverConfigMapName),
 					},
+					Items: []corev1.KeyToPath{
+						{
+							Key:  "rabbitmq.conf",
+							Path: "rabbitmq.conf",
+						},
+						{
+							Key:  "advanced.config",
+							Path: "advanced.config",
+						},
+						{
+							Key:  "rabbitmq-env.conf",
+							Path: "rabbitmq-env.conf",
+						},
+					},
+					Optional: &trueValue,
 				},
 			},
 		},
@@ -276,12 +292,6 @@ func (builder *StatefulSetBuilder) podTemplateSpec(annotations, labels map[strin
 						Name: builder.Instance.ChildResourceName(PluginsConfig),
 					},
 				},
-			},
-		},
-		{
-			Name: "rabbitmq-etc",
-			VolumeSource: corev1.VolumeSource{
-				EmptyDir: &corev1.EmptyDirVolumeSource{},
 			},
 		},
 		{
@@ -386,9 +396,24 @@ func (builder *StatefulSetBuilder) podTemplateSpec(annotations, labels map[strin
 			Name:      "persistence",
 			MountPath: "/var/lib/rabbitmq/mnesia/",
 		},
+		// {
+		// 	Name:      "rabbitmq-etc",
+		// 	MountPath: "/etc/rabbitmq/",
+		// },
 		{
 			Name:      "rabbitmq-etc",
-			MountPath: "/etc/rabbitmq/",
+			MountPath: "/etc/rabbitmq/rabbitmq.conf",
+			SubPath:   "rabbitmq.conf",
+		},
+		{
+			Name:      "rabbitmq-etc",
+			MountPath: "/etc/rabbitmq/rabbitmq-env.conf",
+			SubPath:   "rabbitmq-env.conf",
+		},
+		{
+			Name:      "rabbitmq-etc",
+			MountPath: "/etc/rabbitmq/advanced.config",
+			SubPath:   "advanced.config",
 		},
 		{
 			Name:      "rabbitmq-confd",
@@ -404,6 +429,12 @@ func (builder *StatefulSetBuilder) podTemplateSpec(annotations, labels map[strin
 		},
 	}
 
+	// rabbitmqContainerVolumeMounts = append(rabbitmqContainerVolumeMounts, corev1.VolumeMount{
+	// 	Name:      "rabbitmq-tls",
+	// 	MountPath: "/etc/rabbitmq-tls/tls.crt",
+	// 	SubPath:   "tls.crt",
+	// 	ReadOnly:  true,
+	// })
 	tlsSpec := builder.Instance.Spec.TLS
 	if tlsSpec.SecretName != "" {
 		// add tls port
@@ -506,14 +537,7 @@ func (builder *StatefulSetBuilder) podTemplateSpec(annotations, labels map[strin
 						},
 					},
 					Command: []string{
-						"sh", "-c", "cp /tmp/rabbitmq/rabbitmq.conf /etc/rabbitmq/rabbitmq.conf " +
-							"&& chown 999:999 /etc/rabbitmq/rabbitmq.conf " +
-							"&& echo '' >> /etc/rabbitmq/rabbitmq.conf ; " +
-							"cp /tmp/rabbitmq/advanced.config /etc/rabbitmq/advanced.config " +
-							"&& chown 999:999 /etc/rabbitmq/advanced.config ; " +
-							"cp /tmp/rabbitmq/rabbitmq-env.conf /etc/rabbitmq/rabbitmq-env.conf " +
-							"&& chown 999:999 /etc/rabbitmq/rabbitmq-env.conf ; " +
-							"cp /tmp/erlang-cookie-secret/.erlang.cookie /var/lib/rabbitmq/.erlang.cookie " +
+						"sh", "-c", "cp /tmp/erlang-cookie-secret/.erlang.cookie /var/lib/rabbitmq/.erlang.cookie " +
 							"&& chown 999:999 /var/lib/rabbitmq/.erlang.cookie " +
 							"&& chmod 600 /var/lib/rabbitmq/.erlang.cookie ; " +
 							"cp /tmp/rabbitmq-plugins/enabled_plugins /etc/rabbitmq/enabled_plugins " +
@@ -532,16 +556,8 @@ func (builder *StatefulSetBuilder) podTemplateSpec(annotations, labels map[strin
 					},
 					VolumeMounts: []corev1.VolumeMount{
 						{
-							Name:      "server-conf",
-							MountPath: "/tmp/rabbitmq/",
-						},
-						{
 							Name:      "plugins-conf",
 							MountPath: "/tmp/rabbitmq-plugins/",
-						},
-						{
-							Name:      "rabbitmq-etc",
-							MountPath: "/etc/rabbitmq/",
 						},
 						{
 							Name:      "rabbitmq-erlang-cookie",
